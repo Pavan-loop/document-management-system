@@ -15,7 +15,8 @@ const docSchema = new mongoose.Schema({
   directory: String,
   filename: String,
   data: Buffer,
-  mimetype: String
+  mimetype: String,
+  version: Number // Include version field in the schema
 });
 
 const Doc = mongoose.model('Doc', docSchema);
@@ -36,7 +37,7 @@ Doc.find({ directory: project })
       console.log(`No files found in project "${project}".`);
     } else {
       console.log(`Files in project "${project}":`);
-      files.forEach(file => console.log(file.filename));
+      files.forEach(file => console.log(`${file.filename} (Version ${file.version})`));
     }
     mongoose.disconnect();
   })

@@ -16,7 +16,11 @@ const docSchema = new mongoose.Schema({
   directory: String,
   filename: String,
   data: Buffer,
-  mimetype: String
+  mimetype: String,
+  version: {
+    type: Number,
+    default: 1 // Default version is 1
+  }
 });
 
 const Doc = mongoose.model('Doc', docSchema);
@@ -36,28 +40,47 @@ if (!fs.existsSync(filename)) {
   process.exit(1);
 }
 
-// Read the file and upload to MongoDB
+// Read the file
 fs.readFile(filename, async (err, data) => {
   if (err) {
     console.error('Error reading file:', err);
+    mongoose.disconnect();
     process.exit(1);
   }
 
-  const newDoc = new Doc({
-    directory: project, // Set directory to project name
-    filename: filename,
-    data: data,
-    mimetype: getFileMimeType(filename)
-  });
+  // Check if the file already exists in the project
+  const existingDoc = await Doc.findOne({ directory: project, filename: filename });
 
-  try {
-    await newDoc.save();
-    console.log(`File "${filename}" uploaded to project "${project}".`);
-    mongoose.disconnect();
-  } catch (err) {
-    console.error('Error uploading file:', err);
-    mongoose.disconnect();
-    process.exit(1);
+  if (existingDoc) {
+    // Update the existing document with new data
+    existingDoc.data = data;
+    existingDoc.version += 1;
+    try {
+      await existingDoc.save();
+      console.log(`File "${filename}" updated in project "${project}" (Version ${existingDoc.version}).`);
+      mongoose.disconnect();
+    } catch (err) {
+      console.error('Error updating file:', err);
+      mongoose.disconnect();
+      process.exit(1);
+    }
+  } else {
+    // Create a new document
+    const newDoc = new Doc({
+      directory: project,
+      filename: filename,
+      data: data,
+      mimetype: getFileMimeType(filename)
+    });
+    try {
+      await newDoc.save();
+      console.log(`File "${filename}" uploaded to project "${project}" (Version 1).`);
+      mongoose.disconnect();
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      mongoose.disconnect();
+      process.exit(1);
+    }
   }
 });
 
